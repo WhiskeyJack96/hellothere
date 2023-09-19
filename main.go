@@ -40,7 +40,6 @@ func run(ctx context.Context) error {
 
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.Ready) {
 		for _, g := range vs.Guilds {
-			fmt.Println(g.ID, g.MaxPresences)
 			g, err := session.Guild(g.ID)
 			if err != nil {
 				fmt.Println("could not find guild", err)
@@ -53,6 +52,7 @@ func run(ctx context.Context) error {
 
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		fmt.Println("joined", vs.Member.User.Username, vs.GuildID, vs.ChannelID)
+		fmt.Printf("vs.VoiceState: %v\n", vs.VoiceState)
 		b := strings.Builder{}
 
 		c, ok := m[vs.GuildID]
