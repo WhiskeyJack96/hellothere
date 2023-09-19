@@ -52,7 +52,9 @@ func run(ctx context.Context) error {
 
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		fmt.Println("joined", vs.Member.User.Username, vs.GuildID, vs.ChannelID)
-		fmt.Printf("vs.VoiceState: %v\n", vs.VoiceState)
+		if vs.BeforeUpdate != nil {
+			return
+		}
 		b := strings.Builder{}
 
 		c, ok := m[vs.GuildID]
