@@ -5,13 +5,15 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"log/slog"
 	"os"
 	"os/signal"
 	"slices"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 //go:embed config.json
@@ -173,6 +175,13 @@ func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *
 	if vs.BeforeUpdate != nil {
 		logger.Debug("user already in a voice channel")
 		return false
+	}
+
+	//check quiet hours
+	current := time.Now().Hour();
+	if current < 8 || current > 22 {
+		logger.Debug("quiet hours in effect")
+		return false;
 	}
 
 	//check the users presence
