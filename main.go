@@ -180,6 +180,7 @@ func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *
 	//check quiet hours
 	current := time.Now().Hour();
 	if current < 8 || current > 22 {
+		logger.Debug("quiet hours in effect")
 		return false;
 	}
 
