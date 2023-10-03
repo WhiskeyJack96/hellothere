@@ -32,6 +32,13 @@ type config struct {
 	requiredRoleID string
 }
 
+type slashCommand struct {
+	Description string
+	Handler     func(s *discordgo.Session, i *discordgo.InteractionCreate)
+}
+
+type slashCommands map[string]slashCommand
+
 func run(_ context.Context) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		AddSource:   true,
@@ -46,7 +53,8 @@ func run(_ context.Context) error {
 	}
 
 	//start a bot. args[1] should be the token for the bot.
-	//bot needs permission to see presence, see users, see voice activity, and send messages
+	//bot needs permission to see presence, see users, manage roles, see voice activity, and send messages
+	//https://discord.com/api/oauth2/authorize?client_id=408164522067755008&permissions=139888692224&scope=bot
 	session, err := discordgo.New("Bot " + os.Args[1])
 	if err != nil {
 		return err
@@ -58,6 +66,48 @@ func run(_ context.Context) error {
 		logger.Debug("presence update", slog.String("user", m.User.ID), slog.String("status", string(m.Status)))
 	})
 
+	//TODO refactor the handlers to be factory functions that take in the config/logger/etc and return the function
+	commands := slashCommands{
+		"voice-spam": {
+			Description: "opts the user in to the voice-spam role",
+			Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+				if err := s.GuildMemberRoleAdd(i.GuildID, i.Member.User.ID, m[i.GuildID].requiredRoleID); err != nil {
+					logger.Error("could not add role to user", slog.String("err", err.Error()), slog.String("guild", i.GuildID), slog.String("user", i.Member.User.Username))
+					return
+				}
+
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "Thou hast been granted \"hello-there\"",
+					},
+				})
+			},
+		},
+		"no-spam": {
+			Description: "opts the user out of the voice-spam role",
+			Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+				if err := s.GuildMemberRoleRemove(i.GuildID, i.Member.User.ID, m[i.GuildID].requiredRoleID); err != nil {
+					logger.Error("could not add role to user", slog.String("err", err.Error()), slog.String("guild", i.GuildID), slog.String("user", i.Member.User.Username))
+					return
+				}
+
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "Thou hast had thy privileges revoked",
+					},
+				})
+			},
+		},
+	}
+
+	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		if h, ok := commands[i.ApplicationCommandData().Name]; ok {
+			h.Handler(s, i)
+		}
+	})
+
 	//handle the ready event to prepare config object with guild specific info
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.Ready) {
 		logger.Debug("ready")
@@ -67,7 +117,15 @@ func run(_ context.Context) error {
 				logger.Error("error registering guild", slog.String("err", err.Error()))
 				return
 			}
-			fmt.Println(guildConfig.requiredRoleID)
+
+			//Register interactions
+			for name, cmd := range commands {
+				_, err := session.ApplicationCommandCreate(session.State.User.ID, g.ID, &discordgo.ApplicationCommand{Name: name, Description: cmd.Description})
+				if err != nil {
+					logger.Error("could not register command", slog.String("err", err.Error()))
+				}
+			}
+
 			m[g.ID] = guildConfig
 		}
 	})
