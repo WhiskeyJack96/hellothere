@@ -5,11 +5,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 //go:embed config.json
@@ -20,6 +22,11 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func isQuietHours() bool{
+	current := time.Now().Hour();
+	return current < 8 || current > 22
 }
 
 type config struct {
@@ -53,6 +60,9 @@ func run(ctx context.Context) error {
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
 		fmt.Println("joined", vs.Member.User.Username, vs.GuildID, vs.ChannelID)
 		if vs.BeforeUpdate != nil {
+			return
+		}
+		if isQuietHours() {
 			return
 		}
 		b := strings.Builder{}
