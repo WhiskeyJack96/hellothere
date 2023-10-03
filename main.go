@@ -26,7 +26,7 @@ func main() {
 
 func isQuietHours() bool{
 	current := time.Now().Hour();
-	return current < 7 || current > 21
+	return current < 8 || current > 22
 }
 
 type config struct {
