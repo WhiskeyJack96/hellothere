@@ -82,6 +82,7 @@ func run(_ context.Context) error {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: "Thou hast been granted \"hello-there\"",
+						Flags: discordgo.MessageFlagsEphemeral,
 					},
 				})
 			},
@@ -98,6 +99,7 @@ func run(_ context.Context) error {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: "Thou hast had thy privileges revoked",
+						Flags: discordgo.MessageFlagsEphemeral,
 					},
 				})
 			},
