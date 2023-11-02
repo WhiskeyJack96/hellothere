@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 
 //go:embed config.json
 var configFile []byte
+var timeoutCorner sync.Map
+const timeout = 5 * time.Minute
 
 func main() {
 	if err := run(context.Background()); err != nil {
@@ -157,6 +160,9 @@ func run(_ context.Context) error {
 			logger.Error("could not sent message", slog.String("err", err.Error()))
 			return
 		}
+
+		timeoutCorner.Store(vs.UserID, true)
+		time.AfterFunc(timeout, func() { timeoutCorner.Delete(vs.UserID) })
 	})
 
 	err = session.Open()
@@ -201,6 +207,12 @@ func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *
 	//Ensure the user has opted in to notifications by adopting the role
 	if !userHasRole(vs.Member.Roles, c.requiredRoleID) {
 		logger.Debug("user does not have role")
+		return false
+	}
+
+	_, ok := timeoutCorner.Load(vs.UserID)
+	if ok {
+		logger.Debug("user already joined recently")
 		return false
 	}
 
