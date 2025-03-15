@@ -83,7 +83,7 @@ func run(_ context.Context) error {
 					return
 				}
 
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: "Thou hast been granted \"hello-there\"",
@@ -100,7 +100,7 @@ func run(_ context.Context) error {
 					return
 				}
 
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: "Thou hast had thy privileges revoked",
@@ -285,12 +285,4 @@ func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig config)
 
 func userHasRole(userRoleIDs []string, serverRoleID string) bool {
 	return slices.Contains(userRoleIDs, serverRoleID)
-}
-
-type soundsResponse struct {
-	Items []soundItem `json:items`
-}
-type soundItem struct {
-	Name    string
-	SoundID string `json:"sound_id"`
 }
