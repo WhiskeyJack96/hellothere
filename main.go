@@ -20,6 +20,7 @@ import (
 
 //go:embed config.json
 var configFile []byte
+
 var timeoutCorner sync.Map
 
 const timeout = 5 * time.Minute
@@ -31,12 +32,17 @@ func main() {
 	}
 }
 
-type config struct {
+type GuildConfig struct {
 	NotificationChannelID string
 	EmojiID               string
 	RequiredRoleName      string
 
+	UserConfig map[string]UserConfig
+
 	requiredRoleID string
+}
+type UserConfig struct {
+	OnJoinSound string
 }
 
 type slashCommand struct {
@@ -53,7 +59,7 @@ func run(_ context.Context) error {
 		ReplaceAttr: nil,
 	}))
 	//load config
-	m := map[string]config{}
+	m := map[string]GuildConfig{}
 	err := json.Unmarshal(configFile, &m)
 	if err != nil {
 		return err
@@ -118,7 +124,7 @@ func run(_ context.Context) error {
 	})
 	//handle the ready event to prepare config object with guild specific info
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.Ready) {
-		logger.Debug("ready")
+		logger.Info("ready")
 		for _, g := range vs.Guilds {
 			guildConfig, err := registerGuild(s, g, m[g.ID])
 			if err != nil {
@@ -153,26 +159,9 @@ func run(_ context.Context) error {
 			logger.Warn("unknown guild")
 			return
 		}
-		logger.Info("joined", vs.Member.User.Username)
-		if vs.Member.User.Username == "jcalyon" {
-			vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
-			if err != nil {
-				logger.Error("could not join voice channel", slog.String("err", err.Error()))
-			}
-
-			_, err = s.Request(http.MethodPost, fmt.Sprintf("%s/%s", discordgo.EndpointChannel(vs.ChannelID), "send-soundboard-sound"), map[string]string{
-				"sound_id": "1245884627177046076",
-			})
-			if err != nil {
-				logger.Error("could not send request", slog.String("err", err.Error()))
-			}
-			time.AfterFunc(time.Second*2, func() {
-				err = vc.Disconnect()
-				if err != nil {
-					logger.Error("could not disconnect", slog.String("err", err.Error()))
-					return
-				}
-			})
+		//If the user is configured to play a sound then do that
+		if config, ok := m[vs.GuildID].UserConfig[vs.Member.User.Username]; ok {
+			playSound(s, vs, logger, config.OnJoinSound)
 		}
 
 		if !shouldNotify(s, vs, logger, c) {
@@ -206,8 +195,39 @@ func run(_ context.Context) error {
 	return session.Close()
 }
 
-func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, c config) bool {
-	if vs.Member.User.Username == "ShadowFax" {
+func playSound(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, soundID string) {
+	//in order to play a sound we must join the channel and not be muted
+	vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
+	if err != nil {
+		logger.Error("could not join voice channel", slog.String("err", err.Error()))
+		return
+	}
+
+	//Then we post the sound! The sound should be from the same guild (or we need to update this to handle cross guild sounds)
+	_, err = s.Request(http.MethodPost, fmt.Sprintf("%s/%s", discordgo.EndpointChannel(vs.ChannelID), "send-soundboard-sound"), map[string]string{
+		"sound_id": soundID,
+	})
+	if err != nil {
+		logger.Error("could not send request", slog.String("err", err.Error()))
+		return
+	}
+	//wait a bit to disconnect
+	time.AfterFunc(time.Second*2, func() {
+		//If we've joined another channel already then we should wait for that callback
+		if vc.ChannelID != vs.ChannelID {
+			return
+		}
+		err = vc.Disconnect()
+		if err != nil {
+			logger.Error("could not disconnect", slog.String("err", err.Error()))
+			return
+		}
+	})
+}
+
+func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, c GuildConfig) bool {
+	//skip bot users since we are a bot (and other bots are probably just spam)
+	if vs.Member.User.Bot {
 		return false
 	}
 	//check if the user is just joining voice. This prevents mute/change channel/etc from triggering the notification
@@ -250,7 +270,7 @@ func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *
 	return true
 }
 
-func buildNotificationMessage(c config, vs *discordgo.VoiceStateUpdate, session *discordgo.Session) (string, error) {
+func buildNotificationMessage(c GuildConfig, vs *discordgo.VoiceStateUpdate, session *discordgo.Session) (string, error) {
 	b := strings.Builder{}
 
 	b.WriteString(c.EmojiID + " looks like ")
@@ -270,10 +290,10 @@ func buildNotificationMessage(c config, vs *discordgo.VoiceStateUpdate, session 
 	return b.String(), nil
 }
 
-func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig config) (config, error) {
+func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig GuildConfig) (GuildConfig, error) {
 	guild, err := s.Guild(g.ID)
 	if err != nil {
-		return config{}, err
+		return GuildConfig{}, err
 	}
 	for _, role := range guild.Roles {
 		if role.Name == guildConfig.RequiredRoleName {

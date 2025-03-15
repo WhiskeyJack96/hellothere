@@ -1,12 +1,19 @@
 {
-  "1140034563033268266": {
-    "NotificationChannelID": "1153517582838669322",
-    "EmojiID": "\u003ca:helloThere:1140841602135371787\u003e",
-    "RequiredRoleName": "hello-there"
-  },
-  "203229537021067265": {
-    "NotificationChannelID": "1153517582838669322",
-    "EmojiID": "\u003ca:helloThere:1140841602135371787\u003e",
-    "RequiredRoleName": "hello-there"
+  "GuildConfig": {
+    "1140034563033268266": {
+      "NotificationChannelID": "1153517582838669322",
+      "EmojiID": "\u003ca:helloThere:1140841602135371787\u003e",
+      "RequiredRoleName": "hello-there"
+    },
+    "203229537021067265": {
+      "NotificationChannelID": "1153517582838669322",
+      "EmojiID": "\u003ca:helloThere:1140841602135371787\u003e",
+      "RequiredRoleName": "hello-there",
+      "UserConfig": {
+        "jcalyon": {
+          "OnJoinSound": "1245884627177046076"
+        }
+      }
+    }
   }
 }
