@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"slices"
@@ -20,6 +21,7 @@ import (
 //go:embed config.json
 var configFile []byte
 var timeoutCorner sync.Map
+
 const timeout = 5 * time.Minute
 
 func main() {
@@ -60,6 +62,7 @@ func run(_ context.Context) error {
 	//start a bot. args[1] should be the token for the bot.
 	//bot needs permission to see presence, see users, manage roles, see voice activity, and send messages
 	//https://discord.com/api/oauth2/authorize?client_id=408164522067755008&permissions=139888692224&scope=bot
+	//https://discord.com/oauth2/authorize?client_id=408164522067755008&permissions=39584871222336&integration_type=0&scope=bot
 	session, err := discordgo.New("Bot " + os.Args[1])
 	if err != nil {
 		return err
@@ -85,7 +88,7 @@ func run(_ context.Context) error {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: "Thou hast been granted \"hello-there\"",
-						Flags: discordgo.MessageFlagsEphemeral,
+						Flags:   discordgo.MessageFlagsEphemeral,
 					},
 				})
 			},
@@ -102,7 +105,7 @@ func run(_ context.Context) error {
 					Type: discordgo.InteractionResponseChannelMessageWithSource,
 					Data: &discordgo.InteractionResponseData{
 						Content: "Thou hast had thy privileges revoked",
-						Flags: discordgo.MessageFlagsEphemeral,
+						Flags:   discordgo.MessageFlagsEphemeral,
 					},
 				})
 			},
@@ -114,7 +117,6 @@ func run(_ context.Context) error {
 			h.Handler(s, i)
 		}
 	})
-
 	//handle the ready event to prepare config object with guild specific info
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.Ready) {
 		logger.Debug("ready")
@@ -134,17 +136,44 @@ func run(_ context.Context) error {
 			}
 
 			m[g.ID] = guildConfig
+
+			request, err := session.Request(http.MethodGet, fmt.Sprintf("%s/%s", discordgo.EndpointGuild(g.ID), "soundboard-sounds"), nil)
+			if err != nil {
+				logger.Error("could not sent message", slog.String("err", err.Error()))
+			} else {
+				logger.Debug("sounds:" + string(request))
+			}
 		}
 	})
-
 	session.AddHandler(func(s *discordgo.Session, vs *discordgo.VoiceStateUpdate) {
-		logger = logger.With(slog.String("username", vs.Member.User.Username), slog.String("guild", vs.GuildID), slog.String("channel", vs.ChannelID))
+		logger := logger.With(slog.String("username", vs.Member.User.Username), slog.String("guild", vs.GuildID), slog.String("channel", vs.ChannelID))
 
 		logger.Info("joined")
 		c, ok := m[vs.GuildID]
 		if !ok {
 			logger.Warn("unknown guild")
 			return
+		}
+		logger.Info("joined", vs.Member.User.Username)
+		if vs.Member.User.Username == "jcalyon" {
+			vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
+			if err != nil {
+				logger.Error("could not join voice channel", slog.String("err", err.Error()))
+			}
+
+			_, err = s.Request(http.MethodPost, fmt.Sprintf("%s/%s", discordgo.EndpointChannel(vs.ChannelID), "send-soundboard-sound"), map[string]string{
+				"sound_id": "1245884627177046076",
+			})
+			if err != nil {
+				logger.Error("could not send request", slog.String("err", err.Error()))
+			}
+			time.AfterFunc(time.Second*2, func() {
+				err = vc.Disconnect()
+				if err != nil {
+					logger.Error("could not disconnect", slog.String("err", err.Error()))
+					return
+				}
+			})
 		}
 
 		if !shouldNotify(s, vs, logger, c) {
@@ -179,6 +208,9 @@ func run(_ context.Context) error {
 }
 
 func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, c config) bool {
+	if vs.Member.User.Username == "ShadowFax" {
+		return false
+	}
 	//check if the user is just joining voice. This prevents mute/change channel/etc from triggering the notification
 	if vs.BeforeUpdate != nil {
 		logger.Debug("user already in a voice channel")
@@ -186,10 +218,10 @@ func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *
 	}
 
 	//check quiet hours
-	current := time.Now().Hour();
+	current := time.Now().Hour()
 	if current < 8 || current > 22 {
 		logger.Debug("quiet hours in effect")
-		return false;
+		return false
 	}
 
 	//check the users presence
@@ -254,4 +286,12 @@ func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig config)
 
 func userHasRole(userRoleIDs []string, serverRoleID string) bool {
 	return slices.Contains(userRoleIDs, serverRoleID)
+}
+
+type soundsResponse struct {
+	Items []soundItem `json:items`
+}
+type soundItem struct {
+	Name    string
+	SoundID string `json:"sound_id"`
 }
