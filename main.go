@@ -61,7 +61,6 @@ func run(_ context.Context) error {
 
 	//start a bot. args[1] should be the token for the bot.
 	//bot needs permission to see presence, see users, manage roles, see voice activity, and send messages
-	//https://discord.com/api/oauth2/authorize?client_id=408164522067755008&permissions=139888692224&scope=bot
 	//https://discord.com/oauth2/authorize?client_id=408164522067755008&permissions=39584871222336&integration_type=0&scope=bot
 	session, err := discordgo.New("Bot " + os.Args[1])
 	if err != nil {
