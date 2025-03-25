@@ -154,7 +154,7 @@ func run(_ context.Context) error {
 			return
 		}
 		logger.Info("joined", vs.Member.User.Username)
-		if vs.Member.User.Username == "jcalyon" {
+		if shouldPlaySound(vs, logger) {
 			vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
 			if err != nil {
 				logger.Error("could not join voice channel", slog.String("err", err.Error()))
@@ -204,6 +204,21 @@ func run(_ context.Context) error {
 	<-sc
 	// Cleanly close down the Discord session.
 	return session.Close()
+}
+
+func shouldPlaySound(vs *discordgo.VoiceStateUpdate, logger *slog.Logger) bool {
+	//check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
+	if vs.ChannelID == vs.BeforeUpdate.ChannelID {
+		logger.Debug("user already in same channel")
+		return false
+	}
+
+	//Ensure the user has opted in to sounds
+	if vs.Member.User.Username != "jcalyon" {
+		return false
+	}
+
+	return true
 }
 
 func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, c config) bool {
