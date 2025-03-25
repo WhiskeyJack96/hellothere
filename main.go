@@ -159,7 +159,7 @@ func run(_ context.Context) error {
 			logger.Warn("unknown guild")
 			return
 		}
-    logger.Info("joined", vs.Member.User.Username)
+                logger.Info("joined", vs.Member.User.Username)
 		//If the user is configured to play a sound then do that
 		if shouldPlaySound(vs, logger) {
 			vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
