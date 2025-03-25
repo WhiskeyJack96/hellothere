@@ -214,7 +214,7 @@ func run(_ context.Context) error {
 }
 
 func playSound(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, soundID string) {
-  //check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
+        //check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
 	if vs.ChannelID == vs.BeforeUpdate.ChannelID {
 		logger.Debug("user already in same channel")
 		return false
