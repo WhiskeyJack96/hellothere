@@ -64,6 +64,7 @@ func run(_ context.Context) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(m)
 
 	//start a bot. args[1] should be the token for the bot.
 	//bot needs permission to see presence, see users, manage roles, see voice activity, and send messages
@@ -159,28 +160,9 @@ func run(_ context.Context) error {
 			logger.Warn("unknown guild")
 			return
 		}
-                logger.Info("joined", vs.Member.User.Username)
+    logger.Info("joined", vs.Member.User.Username)
 		//If the user is configured to play a sound then do that
-		if shouldPlaySound(vs, logger) {
-			vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
-			if err != nil {
-				logger.Error("could not join voice channel", slog.String("err", err.Error()))
-			}
-
-			_, err = s.Request(http.MethodPost, fmt.Sprintf("%s/%s", discordgo.EndpointChannel(vs.ChannelID), "send-soundboard-sound"), map[string]string{
-				"sound_id": "1245884627177046076",
-			})
-			if err != nil {
-				logger.Error("could not send request", slog.String("err", err.Error()))
-			}
-			time.AfterFunc(time.Second*2, func() {
-				err = vc.Disconnect()
-				if err != nil {
-					logger.Error("could not disconnect", slog.String("err", err.Error()))
-					return
-				}
-			})
-		}
+		playSound(s, vs, logger, c.UserConfig[vs.Member.User.Username].OnJoinSound)
 
 		if !shouldNotify(s, vs, logger, c) {
 			return
@@ -214,10 +196,14 @@ func run(_ context.Context) error {
 }
 
 func playSound(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, soundID string) {
-        //check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
+	if soundID == "" {
+		logger.Debug("user does not have a join sound configured")
+		return
+	}
+  //check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
 	if vs.BeforeUpdate != nil && vs.ChannelID == vs.BeforeUpdate.ChannelID {
 		logger.Debug("user already in same channel")
-		return false
+		return
 	}
   
 	//in order to play a sound we must join the channel and not be muted
