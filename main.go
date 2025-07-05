@@ -145,7 +145,7 @@ func run(_ context.Context) error {
 
 			request, err := session.Request(http.MethodGet, fmt.Sprintf("%s/%s", discordgo.EndpointGuild(g.ID), "soundboard-sounds"), nil)
 			if err != nil {
-				logger.Error("could not sent message", slog.String("err", err.Error()))
+				logger.Error("could not send message", slog.String("err", err.Error()))
 			} else {
 				logger.Debug("sounds:" + string(request))
 			}
@@ -160,7 +160,7 @@ func run(_ context.Context) error {
 			logger.Warn("unknown guild")
 			return
 		}
-    logger.Info("joined", vs.Member.User.Username)
+		logger.Info("joined", vs.Member.User.Username)
 		//If the user is configured to play a sound then do that
 		playSound(s, vs, logger, c.UserConfig[vs.Member.User.Username].OnJoinSound)
 
@@ -200,39 +200,29 @@ func playSound(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slo
 		logger.Debug("user does not have a join sound configured")
 		return
 	}
-  //check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
-	if vs.BeforeUpdate != nil && vs.ChannelID == vs.BeforeUpdate.ChannelID {
+	//check if the user is just joining voice. This prevents mute/change channel/etc from triggering the sound
+	channelID := vs.ChannelID
+	if vs.BeforeUpdate != nil && channelID == vs.BeforeUpdate.ChannelID {
 		logger.Debug("user already in same channel")
 		return
 	}
-  
+
 	//in order to play a sound we must join the channel and not be muted
-	vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, false)
+	vc, err := s.ChannelVoiceJoin(vs.GuildID, channelID, false, false)
 	if err != nil {
 		logger.Error("could not join voice channel", slog.String("err", err.Error()))
 		return
 	}
+	defer vc.Close()
 
 	//Then we post the sound! The sound should be from the same guild (or we need to update this to handle cross guild sounds)
-	_, err = s.Request(http.MethodPost, fmt.Sprintf("%s/%s", discordgo.EndpointChannel(vs.ChannelID), "send-soundboard-sound"), map[string]string{
+	_, err = s.Request(http.MethodPost, fmt.Sprintf("%s/%s", discordgo.EndpointChannel(channelID), "send-soundboard-sound"), map[string]string{
 		"sound_id": soundID,
 	})
 	if err != nil {
 		logger.Error("could not send request", slog.String("err", err.Error()))
 		return
 	}
-	//wait a bit to disconnect
-	time.AfterFunc(time.Second*2, func() {
-		//If we've joined another channel already then we should wait for that callback
-		if vc.ChannelID != vs.ChannelID {
-			return
-		}
-		err = vc.Disconnect()
-		if err != nil {
-			logger.Error("could not disconnect", slog.String("err", err.Error()))
-			return
-		}
-	})
 }
 
 func shouldNotify(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, c GuildConfig) bool {
