@@ -8,6 +8,14 @@
     "NotificationChannelID": "1153517582838669322",
     "EmojiID": "\u003ca:helloThere:1140841602135371787\u003e",
     "RequiredRoleName": "hello-there",
+    "RoleConfig": {
+      "ManagementChannelID": "1391181476686725270",
+      "MessageID": "1391182063024996414",
+      "EmojiRoleConfig": {
+        "\uD83C\uDFAE": "Video Game Clubber",
+        "Discord": "hello-there"
+      }
+    },
     "UserConfig": {
       "jcalyon": {
         "OnJoinSound": "1245884627177046076"

@@ -32,12 +32,39 @@ func main() {
 	}
 }
 
+type RoleConfig struct {
+	ManagementChannelID string
+	MessageID           string
+
+	EmojiRoleConfig map[string]string
+}
+
+func (rc RoleConfig) ReactionRelevant(logger *slog.Logger, er *discordgo.MessageReaction) (string, bool) {
+	//If the emoji is of the proper kind on the proper message in the proper channel
+	if er.ChannelID != rc.ManagementChannelID {
+		logger.Debug("wrong channel")
+		return "", false
+	}
+	if er.MessageID != rc.MessageID {
+		logger.Debug("wrong message")
+		return "", false
+	}
+	role, ok := rc.EmojiRoleConfig[er.Emoji.Name]
+	if !ok {
+		logger.Debug("unknown emoji")
+		return "", false
+	}
+	return role, true
+}
+
 type GuildConfig struct {
 	NotificationChannelID string
 	EmojiID               string
 	RequiredRoleName      string
 
 	UserConfig map[string]UserConfig
+	//emoji name to role name
+	RoleConfig RoleConfig
 
 	requiredRoleID string
 }
@@ -129,7 +156,10 @@ func run(_ context.Context) error {
 		for _, g := range vs.Guilds {
 			guildConfig, err := registerGuild(s, g, m[g.ID])
 			if err != nil {
-				logger.Error("error registering guild", slog.String("err", err.Error()))
+				logger.Error("error registering guild",
+					slog.String("guild", g.Name),
+					slog.String("err", err.Error()),
+				)
 				return
 			}
 
@@ -182,6 +212,39 @@ func run(_ context.Context) error {
 		time.AfterFunc(timeout, func() { timeoutCorner.Delete(vs.UserID) })
 	})
 
+	session.AddHandler(func(s *discordgo.Session, reactionAdd *discordgo.MessageReactionAdd) {
+		reaction := reactionAdd.MessageReaction
+		logger := reactionLogger(logger, reaction)
+		guildConfig := m[reaction.GuildID]
+		//If the emoji is of the proper kind on the proper message in the proper channel
+		role, relevant := guildConfig.RoleConfig.ReactionRelevant(logger, reaction)
+		if !relevant {
+			return
+		}
+		err := s.GuildMemberRoleAdd(reaction.GuildID, reaction.UserID, role)
+		if err != nil {
+			logger.Error("failed to add role", slog.String("err", err.Error()))
+			return
+		}
+		return
+	})
+	session.AddHandler(func(s *discordgo.Session, reactionRemove *discordgo.MessageReactionRemove) {
+		reaction := reactionRemove.MessageReaction
+		logger := reactionLogger(logger, reaction)
+		guildConfig := m[reaction.GuildID]
+		//If the emoji is of the proper kind on the proper message in the proper channel
+		role, relevant := guildConfig.RoleConfig.ReactionRelevant(logger, reaction)
+		if !relevant {
+			return
+		}
+		err := s.GuildMemberRoleRemove(reaction.GuildID, reaction.UserID, role)
+		if err != nil {
+			logger.Error("failed to add role", slog.String("err", err.Error()))
+			return
+		}
+		return
+	})
+
 	err = session.Open()
 	if err != nil {
 		return err
@@ -193,6 +256,15 @@ func run(_ context.Context) error {
 	<-sc
 	// Cleanly close down the Discord session.
 	return session.Close()
+}
+
+func reactionLogger(logger *slog.Logger, er *discordgo.MessageReaction) *slog.Logger {
+	return logger.With(
+		slog.String("channel", er.ChannelID),
+		slog.String("message", er.MessageID),
+		slog.String("emoji", er.Emoji.Name),
+		slog.String("user", er.UserID),
+	)
 }
 
 func playSound(s *discordgo.Session, vs *discordgo.VoiceStateUpdate, logger *slog.Logger, soundID string) {
@@ -295,10 +367,23 @@ func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig GuildCo
 	if err != nil {
 		return GuildConfig{}, err
 	}
+
+	roles := make(map[string]*discordgo.Role, len(guild.Emojis))
 	for _, role := range guild.Roles {
-		if role.Name == guildConfig.RequiredRoleName {
-			guildConfig.requiredRoleID = role.ID
+		fmt.Println(role.Name)
+		roles[role.Name] = role
+	}
+	for emojiName, roleName := range guildConfig.RoleConfig.EmojiRoleConfig {
+		role, ok := roles[roleName]
+		if !ok {
+			return GuildConfig{}, fmt.Errorf("could not find role %s", roleName)
 		}
+		guildConfig.RoleConfig.EmojiRoleConfig[emojiName] = role.ID
+	}
+
+	role, ok := roles[guildConfig.RequiredRoleName]
+	if ok {
+		guildConfig.requiredRoleID = role.ID
 	}
 	return guildConfig, nil
 }
