@@ -19,6 +19,9 @@
       }
     },
     "UserConfig": {
+      "whiskey.jack": {
+        "OnJoinSound": "1245884627177046076"
+      },
       "jcalyon": {
         "OnJoinSound": "1245884627177046076"
       }
