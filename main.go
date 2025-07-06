@@ -363,6 +363,7 @@ func buildNotificationMessage(c GuildConfig, vs *discordgo.VoiceStateUpdate, ses
 }
 
 func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig GuildConfig) (GuildConfig, error) {
+	//We have to fully resolve the guild, the incoming object is a partial because :(
 	guild, err := s.Guild(g.ID)
 	if err != nil {
 		return GuildConfig{}, err
@@ -370,21 +371,23 @@ func registerGuild(s *discordgo.Session, g *discordgo.Guild, guildConfig GuildCo
 
 	roles := make(map[string]*discordgo.Role, len(guild.Emojis))
 	for _, role := range guild.Roles {
-		fmt.Println(role.Name)
 		roles[role.Name] = role
-	}
-	for emojiName, roleName := range guildConfig.RoleConfig.EmojiRoleConfig {
-		role, ok := roles[roleName]
-		if !ok {
-			return GuildConfig{}, fmt.Errorf("could not find role %s", roleName)
-		}
-		guildConfig.RoleConfig.EmojiRoleConfig[emojiName] = role.ID
 	}
 
 	role, ok := roles[guildConfig.RequiredRoleName]
 	if ok {
 		guildConfig.requiredRoleID = role.ID
 	}
+	if guildConfig.RoleConfig.MessageID != "" {
+		for emojiName, roleName := range guildConfig.RoleConfig.EmojiRoleConfig {
+			role, ok := roles[roleName]
+			if !ok {
+				return GuildConfig{}, fmt.Errorf("could not find role '%s'", roleName)
+			}
+			guildConfig.RoleConfig.EmojiRoleConfig[emojiName] = role.ID
+		}
+	}
+
 	return guildConfig, nil
 }
 
