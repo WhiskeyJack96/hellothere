@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/bwmarrin/discordgo"
 	"log/slog"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 type reactionHandler struct {
@@ -29,8 +30,8 @@ func (r reactionHandler) handleAdd(s *discordgo.Session, reactionAdd *discordgo.
 		logger.Error("failed to add role", slog.String("err", err.Error()))
 		return
 	}
-	return
 }
+
 func (r reactionHandler) handleRemove(s *discordgo.Session, reactionRemove *discordgo.MessageReactionRemove) {
 	reaction := reactionRemove.MessageReaction
 	guildConfig := r.config.Get(reaction.GuildID)
@@ -46,7 +47,6 @@ func (r reactionHandler) handleRemove(s *discordgo.Session, reactionRemove *disc
 		logger.Error("failed to add role", slog.String("err", err.Error()))
 		return
 	}
-	return
 }
 
 func reactionLogger(logger *slog.Logger, er *discordgo.MessageReaction) *slog.Logger {
