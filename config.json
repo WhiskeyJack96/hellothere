@@ -9,13 +9,14 @@
     "EmojiID": "\u003ca:helloThere:1140841602135371787\u003e",
     "RequiredRoleName": "hello-there",
     "RoleConfig": {
-      "ManagementChannelID": "1391181476686725270",
-      "MessageID": "1391182063024996414",
+      "ManagementChannelID": "1416568591649738804",
+      "MessageID": "1416570526901469315",
       "EmojiRoleConfig": {
         "\uD83C\uDFAE": "Video Game Clubber",
         "\uD83D\uDCEC": "Activity Enjoyer",
         "hellothere": "hello-there",
-        "paxwest": "PAX West"
+        "paxwest": "PAX West",
+        "lootdiver": "Helldiver"
       }
     },
     "UserConfig": {
